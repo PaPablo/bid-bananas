@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#f4b400" />
+<title>Bananas</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <h1>🍌 Bananas</h1>
+    </header>
+
+    <section id="screen-home" class="screen active">
+      <div class="card">
+        <h2>¿Banana?</h2>
+        <label>Inversionista</label>
+        <input id="nick" type="text" placeholder="Tu nombre" maxlength="20" />
+        <label>Código de sala</label>
+        <input id="roomCode" type="text" placeholder="XXXXX" maxlength="5" style="text-transform:uppercase" />
+        <div class="row">
+          <button id="btnCreate" class="btn">Crear sala</button>
+          <button id="btnJoin" class="btn primary">Unirse</button>
+        </div>
+        <details class="config">
+          <summary>Configurar partida (solo al crear)</summary>
+          <label>Bananas por caja</label>
+          <input id="cfgCrate" type="number" value="5" min="1" />
+          <label>Puntaje para ganar</label>
+          <input id="cfgTarget" type="number" value="200" min="10" />
+          <label>Puja máxima</label>
+          <input id="cfgMaxBid" type="number" value="1000000" min="1" />
+          <label>Bananas iniciales por jugador</label>
+          <input id="cfgStart" type="number" value="10" min="0" />
+        </details>
+        <p id="homeMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <section id="screen-lobby" class="screen">
+      <div class="card">
+        <h2>Sala <span id="lobbyCode"></span></h2>
+        <p>Compartí este código con tus amigos.</p>
+        <h3>Jugadores</h3>
+        <ul id="playerList" class="list"></ul>
+        <button id="btnStart" class="btn primary hidden">Comenzar partida</button>
+        <p class="hint">El anfitrión inicia el juego. Una vez iniciado no se pueden sumar jugadores.</p>
+        <p id="lobbyMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <section id="screen-game" class="screen">
+      <div class="card">
+        <div class="row between">
+          <div>Sala <strong id="gameCode"></strong></div>
+          <div>Ronda <strong id="roundNum"></strong></div>
+        </div>
+        <div class="crate">
+          📦 Caja: <strong id="crateAmt"></strong> bananas
+        </div>
+        <div class="target">Meta: <span id="targetAmt"></span> bananas</div>
+        <h3>Puntajes</h3>
+        <ul id="scoreList" class="list"></ul>
+      </div>
+
+      <div class="card" id="biddingCard">
+        <h3>Tu puja</h3>
+        <div id="bidStatus" class="msg"></div>
+        <div class="row">
+          <input id="bidValue" type="number" min="0" placeholder="Número" />
+          <button id="btnBid" class="btn primary">Ofrecer</button>
+        </div>
+        <p class="hint">Todos deben ofrecer. Al enviar, esperá a los demás.</p>
+        <ul id="actionList" class="list small"></ul>
+      </div>
+
+      <div class="card hidden" id="resultCard">
+        <h3>Resultado de la ronda</h3>
+        <div id="resultText" class="result"></div>
+        <button id="btnNext" class="btn primary">Siguiente ronda</button>
+        <p class="hint">Avance automático en unos segundos.</p>
+      </div>
+
+      <div class="card hidden" id="gameOverCard">
+        <h2>🏆 ¡Ganador!</h2>
+        <p id="winnerText" class="result"></p>
+        <button id="btnHome" class="btn primary">Volver al inicio</button>
+      </div>
+
+      <div class="card">
+        <button id="btnAbandon" class="btn danger">Abandonar partida</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
