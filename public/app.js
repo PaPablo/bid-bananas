@@ -97,6 +97,15 @@ $("btnJoin").addEventListener("click", () => {
   socket.emit("joinRoom", { code, nick: nickVal() });
 });
 
+$("btnHowTo").addEventListener("click", () => {
+  $("howToDialog").showModal();
+});
+
+// cerrar el instructivo tocando fuera de él
+$("howToDialog").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.close();
+});
+
 $("btnStart").addEventListener("click", () => {
   if (roomCode) socket.emit("startGame", { code: roomCode });
 });

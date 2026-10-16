@@ -36,8 +36,33 @@
           <input id="cfgStart" type="number" value="10" min="0" />
         </details>
         <p id="homeMsg" class="msg"></p>
+        <button id="btnHowTo" class="btn secondary">❓ Cómo jugar</button>
       </div>
     </section>
+
+    <dialog id="howToDialog" class="howto">
+      <h2>🍌 Cómo jugar</h2>
+      <h3>Objetivo</h3>
+      <p>Ser el primero en juntar las bananas de la meta (200 por defecto), o ser el último que queda en pie.</p>
+      <h3>Cada ronda</h3>
+      <ol>
+        <li>Se pone en juego un <strong>pozo</strong> igual a las bananas del jugador más rico (mínimo 1).</li>
+        <li>Cada jugador ofrece en secreto un número.</li>
+        <li>Cuando todos ofrecieron, se develan las ofertas de menor a mayor.</li>
+        <li>La oferta más alta <strong>se lleva el pozo</strong>…</li>
+        <li>…pero le paga al segundo la <strong>diferencia</strong> entre las dos ofertas. Ej.: ofrecés 12 y el segundo 5 → le pagás 7.</li>
+      </ol>
+      <h3>Cuidado</h3>
+      <ul>
+        <li>Si no te alcanzan las bananas para pagar la diferencia, <strong>quedás eliminado</strong> y el pozo pasa a la siguiente oferta más alta.</li>
+        <li>Si dos empatan arriba, se reparten el pozo y pagan la diferencia a medias.</li>
+        <li>Los eliminados siguen mirando la partida.</li>
+      </ul>
+      <p class="hint">Tip: ofrecer mucho te asegura el pozo, pero también te puede dejar afuera.</p>
+      <form method="dialog">
+        <button class="btn primary">¡Entendido!</button>
+      </form>
+    </dialog>
 
     <section id="screen-lobby" class="screen">
       <div class="card">

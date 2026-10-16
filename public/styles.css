@@ -49,3 +49,12 @@ input { width:100%; padding:12px; font-size:16px; border:1px solid #ddd; border-
 #gameOverCard.pop { animation: bid-pop .8s ease; }
 @keyframes bid-pop { 0% { transform: scale(.8); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
 @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+
+/* Instructivo */
+.howto { border: none; border-radius: 14px; padding: 20px; width: min(92vw, 520px); max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+.howto::backdrop { background: rgba(0,0,0,.45); }
+.howto h3 { margin: 14px 0 6px; color: #b38300; }
+.howto ol, .howto ul { padding-left: 20px; margin: 0; line-height: 1.5; font-size: 15px; }
+.howto p { line-height: 1.5; font-size: 15px; margin: 6px 0; }
+.howto form { margin-top: 14px; display: flex; }
+.howto[open] { animation: bid-pop .4s ease; }
