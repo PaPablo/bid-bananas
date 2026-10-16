@@ -234,7 +234,7 @@ function resolveRound(room) {
       if (room.round && room.round.phase === 'result' && !room.gameOver) {
         startRound(room);
       }
-    }, 12000);
+    }, 12000 + bids.length * 1200); // deja terminar el develado en el cliente
   }
 }
 

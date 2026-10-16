@@ -10,6 +10,7 @@ let roomCode = null;
 let lastState = null;
 let isAnimatingResult = false;
 let animatedRound = 0;
+let scoreSnapshot = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -107,49 +108,55 @@ function renderGame(state) {
   const round = state.round || {};
   $("crateAmt").textContent = round.pot != null ? round.pot : 0;
 
-  // scores
-  const su = $("scoreList");
-  su.innerHTML = "";
-  state.players.forEach((p) => {
-    const li = document.createElement("li");
-    li.innerHTML = `<span>${escape(p.nick)} ${p.id === myId ? "(vos)" : ""} ${p.alive === false ? "👻" : ""}</span><span><strong>${p.bananas}</strong> 🍌 ${p.connected ? "" : "⚠️"}</span>`;
-    su.appendChild(li);
-  });
-
   const isResult = round.phase === "result";
-  // bidding card
+  if (!isResult) {
+    if (isAnimatingResult) cancelReveal(); // empezó otra ronda
+    // puntajes previos al resultado, para no arruinar el suspenso
+    scoreSnapshot = state.players.map((p) => ({ ...p }));
+  }
+
   const biddingCard = $("biddingCard");
   const resultCard = $("resultCard");
   const gameOverCard = $("gameOverCard");
-
-  if (state.gameOver) {
-    biddingCard.classList.add("hidden");
-    resultCard.classList.add("hidden");
-    gameOverCard.classList.remove("hidden");
-    const winner = state.players.find((p) => p.id === state.winnerId);
-    $("winnerText").textContent =
-      (winner ? winner.nick : "Alguien") +
-      " alcanzó " +
-      state.config.target +
-      " bananas y ganó la partida.";
-    return;
-  } else {
-    gameOverCard.classList.add("hidden");
-  }
 
   if (isResult) {
     biddingCard.classList.add("hidden");
     resultCard.classList.remove("hidden");
     if (animatedRound !== state.roundNumber) {
+      gameOverCard.classList.add("hidden");
       animateOffers(state, round);
-    } else {
+    } else if (!isAnimatingResult) {
       renderResult(state, round);
+      if (state.gameOver) showGameOver(state, false);
     }
+    // si se está animando, no se toca el develado en curso
+  } else if (state.gameOver) {
+    // fin de partida sin ronda que develar (ej.: abandonos)
+    biddingCard.classList.add("hidden");
+    resultCard.classList.add("hidden");
+    showGameOver(state, false);
   } else {
+    gameOverCard.classList.add("hidden");
     biddingCard.classList.remove("hidden");
     resultCard.classList.add("hidden");
     renderBidding(state, round);
   }
+
+  renderScores(state);
+}
+
+function renderScores(state) {
+  // durante el develado se muestran los puntajes de antes de la ronda
+  const source =
+    isAnimatingResult && scoreSnapshot ? scoreSnapshot : state.players;
+  const su = $("scoreList");
+  su.innerHTML = "";
+  state.players.forEach((cur) => {
+    const p = source.find((x) => x.id === cur.id) || cur;
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${escape(cur.nick)} ${cur.id === myId ? "(vos)" : ""} ${p.alive === false ? "👻" : ""}</span><span><strong>${p.bananas}</strong> 🍌 ${cur.connected ? "" : "⚠️"}</span>`;
+    su.appendChild(li);
+  });
 }
 
 function renderBidding(state, round) {
@@ -209,149 +216,211 @@ $("btnHome").addEventListener("click", () => {
   show("home");
 });
 
+// ---------- Develado de ofertas ----------
+
+const REVEAL = {
+  start: 500, // antes de la primera oferta
+  step: 1000, // entre ofertas
+  drumroll: 1600, // suspenso antes de la oferta más alta
+  pause: 1200, // entre el develado y el desenlace
+  outcome: 1300, // entre cada bloque del desenlace
+  gameOver: 1800, // antes de anunciar al ganador de la partida
+};
+
+let revealTimers = [];
+
+function at(ms, fn) {
+  revealTimers.push(setTimeout(fn, ms));
+}
+
+function cancelReveal() {
+  revealTimers.forEach(clearTimeout);
+  revealTimers = [];
+  isAnimatingResult = false;
+}
+
+function nickOf(state, id) {
+  const p = state.players.find((x) => x.id === id);
+  return p ? p.nick : id;
+}
+
+function names(state, ids) {
+  return (ids || []).map((id) => escape(nickOf(state, id))).join(" y ");
+}
+
+// Agrega un elemento al develado; con animate aparece con fade-in.
+function addItem(container, html, cls, animate) {
+  const d = document.createElement("div");
+  d.className = "reveal-item " + (cls || "");
+  d.innerHTML = html;
+  container.appendChild(d);
+  if (animate) void d.offsetWidth; // reflow para que la transición se dispare
+  d.classList.add("in");
+  return d;
+}
+
+function sortedBids(state, r) {
+  const bids = r.bids || {};
+  return Object.keys(bids)
+    .map((id) => ({ id, nick: nickOf(state, id), val: Number(bids[id]) || 0 }))
+    .sort((a, b) => a.val - b.val);
+}
+
+function bidRow(container, e, cls, animate) {
+  const row = addItem(
+    container,
+    `<span>${escape(e.nick)}</span><span class="bid-val">${e.val}</span>`,
+    "bid-row " + (cls || ""),
+    animate,
+  );
+  row.dataset.id = e.id;
+  return row;
+}
+
+// Desenlace en orden: eliminados, ganador del pozo, pago al segundo.
+function outcomeBlocks(state, r) {
+  const blocks = [];
+  const elim = r.eliminated || [];
+  if (elim.length) {
+    const many = elim.length > 1;
+    blocks.push({
+      cls: "out-msg",
+      html: `❌ <strong>${names(state, elim)}</strong> ${many ? "quedaron eliminados" : "quedó eliminado"}: no ${many ? "podían" : "podía"} pagar el impuesto.`,
+    });
+  }
+  if (r.type === "win") {
+    blocks.push({
+      cls: "win-msg",
+      html: `🏆 <strong>${names(state, [r.winner])}</strong> se lleva el pozo de <strong>${r.pot}</strong> 🍌`,
+    });
+    blocks.push({
+      cls: "pay-msg",
+      html: r.second
+        ? `💸 Le paga <strong>${r.tariff}</strong> 🍌 a <strong>${names(state, [r.second])}</strong> (${r.maxVal} − ${r.secondVal})`
+        : "💸 No hay segundo: no paga impuesto.",
+    });
+  } else if (r.type === "tie") {
+    const leaders = r.leaders || [];
+    const share = (r.shares || {})[leaders[0]] || 0;
+    blocks.push({
+      cls: "win-msg",
+      html: `🤝 Empate entre <strong>${names(state, leaders)}</strong> con ${r.maxVal}: se reparten el pozo de <strong>${r.pot}</strong> 🍌 (${share} c/u)`,
+    });
+    const pays = leaders.map((id) => (r.payments || {})[id] || 0).join(" + ");
+    blocks.push({
+      cls: "pay-msg",
+      html:
+        r.second && r.tariff
+          ? `💸 Le pagan <strong>${r.tariff}</strong> 🍌 a <strong>${names(state, [r.second])}</strong> (${pays})`
+          : "💸 Sin impuesto.",
+    });
+  } else {
+    blocks.push({
+      cls: "out-msg",
+      html: `📦 Nadie se lleva el pozo de <strong>${r.pot}</strong> 🍌`,
+    });
+  }
+  return blocks;
+}
+
+function gameWinnerHtml(state, r) {
+  return `🎉 <strong>${escape(nickOf(state, r.gameWinner))}</strong> ganó la partida!`;
+}
+
+function highlightRows(container, r) {
+  const mark = (id, cls) => {
+    const row = container.querySelector(
+      `.bid-row[data-id="${CSS.escape(id)}"]`,
+    );
+    if (row) row.classList.add(cls);
+  };
+  (r.eliminated || []).forEach((id) => mark(id, "out"));
+  if (r.type === "win") mark(r.winner, "top");
+  if (r.type === "tie") (r.leaders || []).forEach((id) => mark(id, "top"));
+  if ((r.type === "win" || r.type === "tie") && r.second)
+    mark(r.second, "second");
+}
+
+function showGameOver(state, animate) {
+  const card = $("gameOverCard");
+  const winner = state.players.find((p) => p.id === state.winnerId);
+  const name = winner ? winner.nick : "Alguien";
+  $("winnerText").textContent =
+    winner && winner.bananas >= state.config.target
+      ? `${name} alcanzó ${state.config.target} bananas y ganó la partida.`
+      : `${name} es el último en pie y ganó la partida.`;
+  card.classList.remove("hidden", "pop");
+  if (animate) {
+    void card.offsetWidth;
+    card.classList.add("pop");
+  }
+}
+
+// Develado con suspenso: ofertas de menor a mayor y después el desenlace.
 function animateOffers(state, round) {
-  if (isAnimatingResult) return;
+  cancelReveal();
   isAnimatingResult = true;
   animatedRound = state.roundNumber;
   const r = round.result || {};
-  const bids = r.bids || {};
-  const entries = Object.keys(bids)
-    .map((id) => {
-      const p = state.players.find((x) => x.id === id);
-      return { id, nick: p ? p.nick : id, val: bids[id] };
-    })
-    .sort((a, b) => {
-      const va = typeof a.val === "number" ? a.val : 0;
-      const vb = typeof b.val === "number" ? b.val : 0;
-      return va - vb;
-    });
   const el = $("resultText");
-  const revealed = [];
-  el.textContent = "🎬 Revelando ofertas...";
-  let delay = 500;
-  entries.forEach((e) => {
-    setTimeout(() => {
-      revealed.push(e);
-      const txt = ["🎬 Revelando ofertas...", ""];
-      revealed.forEach((x) => {
-        txt.push("  " + x.nick + ": " + x.val);
-      });
-      el.textContent = txt.join("\n");
-    }, delay);
-    delay += 700;
+  el.innerHTML = "";
+  const header = addItem(el, "🎬 Develando ofertas...", "reveal-title", true);
+  const entries = sortedBids(state, r);
+
+  let t = REVEAL.start;
+  entries.forEach((e, i) => {
+    const isLast = i === entries.length - 1;
+    if (isLast && entries.length > 1) {
+      at(t, () =>
+        addItem(el, "🥁 Y la oferta más alta es...", "drumroll", true),
+      );
+      t += REVEAL.drumroll;
+    }
+    at(t, () => bidRow(el, e, isLast ? "last" : "", true));
+    if (!isLast) t += REVEAL.step;
   });
-  setTimeout(() => {
+
+  t += REVEAL.pause;
+  at(t, () => {
+    const dr = el.querySelector(".drumroll");
+    if (dr) dr.remove();
+    header.textContent = "📊 Ofertas";
+    highlightRows(el, r);
+  });
+
+  outcomeBlocks(state, r).forEach((b) => {
+    t += REVEAL.outcome;
+    at(t, () => addItem(el, b.html, "outcome " + b.cls, true));
+  });
+
+  // los puntajes se actualizan recién al terminar el desenlace de la ronda
+  at(t + 300, () => {
     isAnimatingResult = false;
-    renderResult(state, round);
-  }, delay + 400);
+    renderScores(lastState || state);
+  });
+
+  if (r.gameWinner) {
+    t += REVEAL.gameOver;
+    at(t, () => {
+      addItem(el, gameWinnerHtml(state, r), "outcome game-msg", true);
+      showGameOver(lastState || state, true);
+    });
+  }
 }
 
+// Versión sin animación (por ejemplo al reconectar durante un resultado).
 function renderResult(state, round) {
   const r = round.result || {};
-  const bids = r.bids || {};
-  let lines = [];
-  lines.push("📊 Ofertas reveladas:");
-  state.players.forEach((p) => {
-    const b = bids[p.id];
-    const val = b === "DIVIDIR" ? "DIVIDIR" : b == null ? "-" : b;
-    lines.push(`  ${p.nick}: ${val}`);
-  });
-  lines.push("");
-  if (r.type === "split") {
-    lines.push("🤝 La caja se dividió entre todos.");
-    lines.push("Bananas de la caja: " + r.pot);
-    state.players.forEach((p) => {
-      lines.push(`  ${p.nick} recibió ${r.shares[p.id] || 0}`);
-    });
-  } else if (r.type === "tie") {
-    const names = (r.leaders || [])
-      .map((id) => {
-        const p = state.players.find((x) => x.id === id);
-        return p ? p.nick : id;
-      })
-      .join(" y ");
-    if (r.tariff) {
-      lines.push(`🤝 Empate entre ${names} con ${r.maxVal}.`);
-      lines.push(
-        `Impuesto total ${r.tariff} dividido entre ambos (${Object.values(r.payments || {}).join(" y ")}).`,
-      );
-      if (r.second) {
-        const sp = state.players.find((x) => x.id === r.second);
-        lines.push(`Pagado a ${sp ? sp.nick : r.second} (${r.secondVal}).`);
-      }
-      lines.push(
-        `Se llevó la caja (${r.pot}): ${Math.floor(r.pot / 2)} cada uno.`,
-      );
-      (r.leaders || []).forEach((id) => {
-        const p = state.players.find((x) => x.id === id);
-        lines.push(`  🏆 ${p ? p.nick : id} recibió ${r.shares[id] || 0}`);
-      });
-    } else {
-      lines.push(`🤝 Empate entre ${names} con ${r.maxVal}.`);
-      lines.push(`Se dividió la caja (${r.pot}) entre los empatados.`);
-      (r.leaders || []).forEach((id) => {
-        const p = state.players.find((x) => x.id === id);
-        lines.push(`  🏆 ${p ? p.nick : id} recibió ${r.shares[id] || 0}`);
-      });
-    }
-  } else if (r.type === "win") {
-    const w = state.players.find((p) => p.id === r.winner);
-    const s = state.players.find((p) => p.id === r.second);
-    lines.push(
-      `🏆 GANÓ EL CRATE: ${w ? w.nick : r.winner} (ofreció ${r.maxVal})`,
-    );
-    lines.push(`Se llevó ${r.pot} bananas de la caja.`);
-    if (r.second) {
-      lines.push(
-        `Impuesto ${r.tariff}: ${w ? w.nick : r.winner} pagó ${r.tariff} a ${s ? s.nick : r.second} (ofreció ${r.secondVal}).`,
-      );
-    } else {
-      lines.push(`Impuesto ${r.tariff}.`);
-    }
-    const winners = [r.winner];
-    const outside = state.players.filter((p) => !winners.includes(p.id));
-    if (outside.length) {
-      lines.push(
-        "⛔ Se quedaron fuera del crate: " +
-          outside.map((p) => p.nick).join(", "),
-      );
-    }
-  } else if (r.type === "nocapacity") {
-    const w = Array.isArray(r.winner) ? r.winner : [r.winner];
-    const wn = state.players
-      .filter((p) => w.includes(p.id))
-      .map((p) => p.nick)
-      .join(" y ");
-    lines.push(
-      `⚠️ ${wn} ofreció ${r.maxVal} pero no pudo pagar el impuesto de ${r.tariff}.`,
-    );
-    lines.push(`No ganó el crate (${r.pot}); queda para la próxima ronda.`);
-    if (r.second) {
-      const s = state.players.find((p) => p.id === r.second);
-      lines.push(`Segundo: ${s ? s.nick : r.second} (ofreció ${r.secondVal}).`);
-    }
-    const outside = state.players.filter((p) => !w.includes(p.id));
-    if (outside.length) {
-      lines.push(
-        "⛔ Se quedaron fuera: " + outside.map((p) => p.nick).join(", "),
-      );
-    }
-  }
-  if (r.eliminated && r.eliminated.length) {
-    const en = r.eliminated
-      .map((id) => {
-        const p = state.players.find((x) => x.id === id);
-        return p ? p.nick : id;
-      })
-      .join(", ");
-    lines.push("❌ Eliminados esta ronda: " + en);
-  }
-  if (r.gameWinner) {
-    const gw = state.players.find((p) => p.id === r.gameWinner);
-    lines.push("");
-    lines.push("🎉 " + (gw ? gw.nick : r.gameWinner) + " ganó la partida!");
-  }
-  $("resultText").textContent = lines.join("\n");
+  const el = $("resultText");
+  el.innerHTML = "";
+  addItem(el, "📊 Ofertas", "reveal-title", false);
+  sortedBids(state, r).forEach((e) => bidRow(el, e, "", false));
+  highlightRows(el, r);
+  outcomeBlocks(state, r).forEach((b) =>
+    addItem(el, b.html, "outcome " + b.cls, false),
+  );
+  if (r.gameWinner)
+    addItem(el, gameWinnerHtml(state, r), "outcome game-msg", false);
 }
 
 function escape(s) {

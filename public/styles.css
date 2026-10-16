@@ -27,3 +27,25 @@ input { width:100%; padding:12px; font-size:16px; border:1px solid #ddd; border-
 @media (max-width:420px){ .btn{font-size:15px;} } .btn.danger { background:#d94a4a; color:#fff; width:100%; }
 .config { margin-top:12px; }
 .config summary { cursor:pointer; font-weight:600; color:#4a90d9; }
+
+/* Develado de ofertas */
+#resultText { white-space: normal; display: flex; flex-direction: column; gap: 6px; }
+.reveal-item { opacity: 0; transform: translateY(10px) scale(.97); transition: opacity .6s ease, transform .6s ease, background-color .5s, color .5s; }
+.reveal-item.in { opacity: 1; transform: none; }
+.reveal-title { font-weight: 700; color: #555; }
+.bid-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #fff; border-radius: 8px; }
+.bid-val { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bid-row.last.in { animation: bid-pop .7s ease; }
+.bid-row.top { background: #f4b400; color: #fff; }
+.bid-row.second { background: #dfe7f2; }
+.bid-row.out { background: #fde2e2; color: #b00020; }
+.bid-row.out .bid-val { text-decoration: line-through; }
+.drumroll { text-align: center; font-style: italic; color: #777; animation: pulse 1s ease-in-out infinite; }
+.outcome { padding: 10px 12px; border-radius: 8px; line-height: 1.4; }
+.win-msg { background: #fff3c4; }
+.pay-msg { background: #e6f0fb; }
+.out-msg { background: #fde2e2; }
+.game-msg { background: #f4b400; color: #fff; font-size: 18px; text-align: center; }
+#gameOverCard.pop { animation: bid-pop .8s ease; }
+@keyframes bid-pop { 0% { transform: scale(.8); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
